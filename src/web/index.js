@@ -1,5 +1,7 @@
 import { installApplication, getApplication } from "../core/index";
 import { WebFileSystemProvider } from "./filesystem/file-system-provider";
+import { ServerFileSystemProvider } from "./filesystem/server-file-system-provider";
+import { isEmbedded, getToken, signalReady } from "./server-config";
 import { SettingsController } from "../core/controllers/settings-controller";
 import { RecentFilesController } from "../core/controllers/recent-files-controller";
 import {
@@ -10,7 +12,12 @@ import { titleFromMapState } from "../core/util/title-utils";
 
 function setupApplication() {
   const application = installApplication();
-  application.fileSystemProvider = new WebFileSystemProvider();
+  if (isEmbedded()) {
+    application.fileSystemProvider = new ServerFileSystemProvider(getToken);
+    signalReady();
+  } else {
+    application.fileSystemProvider = new WebFileSystemProvider();
+  }
   application.addEventListener("map-state-changed", (event) => {
     const mapState = event.detail;
     document.title = titleFromMapState(mapState);
