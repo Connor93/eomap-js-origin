@@ -12,7 +12,9 @@ export class ServerFileSystemProvider {
     return true;
   }
 
-  async _listMapIds() {
+  // Returns the server's maps as [{ id, name }]. `maps` carries names; older
+  // backends return only `ids` — fall back to names of null in that case.
+  async _listMaps() {
     const res = await fetch(`/api/maps`, {
       headers: { Authorization: `Bearer ${this._getToken()}` },
     });
@@ -20,18 +22,30 @@ export class ServerFileSystemProvider {
       throw new Error(`Failed to list maps (HTTP ${res.status})`);
     }
     const body = await res.json();
-    return Array.isArray(body.ids) ? body.ids : [];
+    if (Array.isArray(body.maps)) {
+      return body.maps;
+    }
+    if (Array.isArray(body.ids)) {
+      return body.ids.map((id) => ({ id, name: null }));
+    }
+    return [];
   }
 
   async showOpenFilePicker(_options) {
-    const ids = await this._listMapIds();
-    const mapId = await openServerMapDialog(ids); // rejects AbortError on cancel
-    return [new ServerFileSystemFileHandle(this._getToken, mapId)];
+    const maps = await this._listMaps();
+    const choice = await openServerMapDialog(maps); // {id, name}; rejects AbortError on cancel
+    return [
+      new ServerFileSystemFileHandle(
+        this._getToken,
+        choice.id,
+        choice.name || undefined,
+      ),
+    ];
   }
 
   async showSaveFilePicker(_options) {
-    const ids = await this._listMapIds();
-    const mapId = await saveServerMapDialog(ids); // rejects AbortError on cancel
+    const maps = await this._listMaps();
+    const mapId = await saveServerMapDialog(maps.map((m) => m.id)); // rejects AbortError on cancel
     return new ServerFileSystemFileHandle(this._getToken, mapId);
   }
 
