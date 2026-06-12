@@ -9,6 +9,13 @@ export class ServerFileSystemFileHandle {
     this.name = name || `${String(mapId).padStart(5, "0")}.emf`;
   }
 
+  // The FileSystemHandle interface requires `path` — eomap-js uses it as the
+  // Recent Files menu label (and electron native recent docs). We have no real
+  // filesystem path, so expose the display name.
+  get path() {
+    return this.name;
+  }
+
   async getFile() {
     const res = await fetch(`/api/maps/${this.mapId}`, {
       headers: { Authorization: `Bearer ${this._getToken()}` },
