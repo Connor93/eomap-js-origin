@@ -11,6 +11,7 @@
     "dist": "npm run dist:web && npm run dist:electron",
     "dist:electron": "npm run build && electron-builder --config electron-builder-config.js --publish never",
     "dist:web": "cross-env NODE_ENV=production webpack --config webpack/web/web.js",
+    "dist:web:embedded": "cross-env NODE_ENV=production webpack --config webpack/web/web.js --env FORCE_CONNECTED_MODE_URL=/api/mapper/",
     "build": "cross-env NODE_ENV=production node scripts/build.js",
     "format": "prettier --cache --write **/*.{js,md}",
     "prepare": "husky",
