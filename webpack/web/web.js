@@ -31,9 +31,18 @@ module.exports = (env) =>
   merge(base(env), {
     entry: "./src/web/index.js",
     output: {
-      filename: "bundle.min.js",
+      // Content-hashed: the editor is embedded in an iframe the host app mounts
+      // after load, which never receives a reload's cache bypass. With a stable
+      // filename a browser that cached the bundle before it had a Cache-Control
+      // header keeps serving it -- so a deploy is invisible until the heuristic
+      // freshness window lapses. A hash in the name changes the URL instead,
+      // which no cache entry can match.
+      filename: "bundle.[contenthash].min.js",
       path: path.resolve(__dirname, "../../dist/web"),
       publicPath: "auto",
+      // Hashed names accumulate otherwise -- every past build would ship in the
+      // image alongside the current one.
+      clean: true,
     },
     module: {
       rules: [

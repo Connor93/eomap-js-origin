@@ -5,9 +5,18 @@ import "@spectrum-web-components/icon/sp-icon.js";
 import pickerStyles from "@spectrum-web-components/picker/src/picker.css.js";
 import chevronStyles from "@spectrum-web-components/icon/src/spectrum-icon-chevron.css.js";
 
+import scrollbarStyles from "../styles/scrollbar";
+
 import { Dropdown } from "./dropdown";
 import { MenuItem } from "@spectrum-web-components/menu/src/MenuItem.js";
 import { Overlay } from "@spectrum-web-components/overlay/src/overlay.js";
+
+// Keep in sync with the menu item height in menu-item.js and the vertical
+// padding on the menu host in menu.js -- the popup height cap is expressed in
+// whole rows, so it has to know how tall a row is.
+const MENU_ITEM_HEIGHT = 26;
+const MENU_VERTICAL_PADDING = 4;
+const MENU_MAX_VISIBLE_ITEMS = 10;
 
 const chevronClass = {
   s: "spectrum-UIIcon-ChevronDown75",
@@ -21,6 +30,7 @@ export class Picker extends Dropdown {
     return [
       pickerStyles,
       chevronStyles,
+      scrollbarStyles,
       ...super.styles,
       css`
         :host {
@@ -45,6 +55,22 @@ export class Picker extends Dropdown {
         #menu {
           background-color: var(--spectrum-global-color-gray-50);
           border-color: var(--spectrum-alias-component-border-color-default);
+          /*
+           * Cap the popup at MENU_MAX_VISIBLE_ITEMS rows and scroll past that.
+           * Without this a long list (the music picker has ~30 entries) renders
+           * at its full height and runs off the bottom of the screen with no
+           * way to reach the items below the fold.
+           */
+          max-height: calc(
+            ${MENU_MAX_VISIBLE_ITEMS} * ${MENU_ITEM_HEIGHT}px +
+              ${MENU_VERTICAL_PADDING * 2}px
+          );
+          overflow-y: auto;
+          /*
+           * Don't let a wheel past the end of the list chain out to the
+           * page -- onWindowScroll dismisses the picker on any scroll.
+           */
+          overscroll-behavior: contain;
         }
         #button {
           --spectrum-actionbutton-label-flex-grow: 1;
@@ -206,6 +232,7 @@ export class Picker extends Dropdown {
     if (changedProperties.has("open")) {
       if (this.open) {
         this.menu.focusMenuItem(this.selectedItem);
+        this.scrollSelectedItemIntoView();
         this.focus();
         window.addEventListener("scroll", this.onWindowScroll, {
           capture: true,
@@ -215,6 +242,31 @@ export class Picker extends Dropdown {
         window.removeEventListener("scroll", this.onWindowScroll);
       }
       this.focused = false;
+    }
+  }
+
+  /**
+   * Bring the selected item into view within the (now scrollable) menu.
+   *
+   * Only the menu's own scrollTop is touched -- scrollIntoView() would walk up
+   * and scroll ancestors too, and moving the button out from under an open
+   * popup makes checkButtonPosition() slam it shut again.
+   */
+  scrollSelectedItemIntoView() {
+    const menu = this.menu;
+    const item = this.selectedItem;
+
+    if (!menu || !item) {
+      return;
+    }
+
+    const menuRect = menu.getBoundingClientRect();
+    const itemRect = item.getBoundingClientRect();
+
+    if (itemRect.top < menuRect.top) {
+      menu.scrollTop += itemRect.top - menuRect.top;
+    } else if (itemRect.bottom > menuRect.bottom) {
+      menu.scrollTop += itemRect.bottom - menuRect.bottom;
     }
   }
 

@@ -17,6 +17,7 @@ import "./menu-divider";
 import { CHAR_MAX, SHORT_MAX } from "../data/eo-numeric-limits";
 import { MapEffect, MapType, MusicControl } from "../data/emf";
 import { MapPropertiesState } from "../state/map-properties-state";
+import { MUSIC_TRACKS } from "../data/music-tracks";
 
 @customElement("eomap-properties")
 export class Properties extends LitElement {
@@ -61,6 +62,15 @@ export class Properties extends LitElement {
 
   @property({ type: Boolean, reflect: true })
   open = false;
+
+  /**
+   * A map's current music id when it is not one of MUSIC_TRACKS -- a legacy
+   * or hand-set value. Rendered as an extra item so opening the dialog on
+   * such a map shows the real value and saving preserves it, instead of
+   * silently snapping the map to a different track.
+   */
+  @property({ attribute: false })
+  unknownMusicId = null;
 
   updated(changed) {
     if (changed.has("open")) {
@@ -159,12 +169,27 @@ export class Properties extends LitElement {
   renderAudio() {
     return html`
       <sp-field-group>
-        <div>
+        <div class="picker-container">
           <sp-field-label for="music">Music</sp-field-label>
-          <eomap-number-field
-            id="music"
-            max="${CHAR_MAX - 1}"
-          ></eomap-number-field>
+          <eomap-picker id="music">
+            <eomap-menu-item label="None" value="0"></eomap-menu-item>
+            ${MUSIC_TRACKS.map(
+              (track) => html`
+                <eomap-menu-item
+                  label="${track.label}"
+                  value="${track.id}"
+                ></eomap-menu-item>
+              `,
+            )}
+            ${this.unknownMusicId === null
+              ? ""
+              : html`
+                  <eomap-menu-item
+                    label="${this.unknownMusicId} — unrecognised"
+                    value="${this.unknownMusicId}"
+                  ></eomap-menu-item>
+                `}
+          </eomap-picker>
         </div>
         <div>
           <sp-field-label for="ambient-sound">Ambient Sound</sp-field-label>
@@ -282,7 +307,6 @@ export class Properties extends LitElement {
   populate(emf) {
     this.width.invalid = false;
     this.height.invalid = false;
-    this.music.invalid = false;
     this.ambientSound.invalid = false;
     this.respawnX.invalid = false;
     this.respawnY.invalid = false;
@@ -294,11 +318,22 @@ export class Properties extends LitElement {
     this.effect.value = emf.effect.toString();
     this.minimap.checked = emf.mapAvailable;
     this.scrolls.checked = emf.canScroll;
-    this.music.value = emf.musicID;
     this.ambientSound.value = emf.ambientSoundID;
     this.musicControl.value = emf.musicControl.toString();
     this.respawnX.value = emf.relogX;
     this.respawnY.value = emf.relogY;
+
+    this.unknownMusicId =
+      emf.musicID === 0 || MUSIC_TRACKS.some((t) => t.id === emf.musicID)
+        ? null
+        : emf.musicID;
+
+    // populate() is called synchronously from showMapProperties() and its
+    // result is not awaited, so the unrecognised-id item above does not exist
+    // yet. Set the value once lit has flushed that render.
+    this.updateComplete.then(() => {
+      this.music.value = emf.musicID.toString();
+    });
   }
 
   validateRequired(field) {
@@ -308,7 +343,6 @@ export class Properties extends LitElement {
   validateFields() {
     this.validateRequired(this.width);
     this.validateRequired(this.height);
-    this.validateRequired(this.music);
     this.validateRequired(this.ambientSound);
     this.validateRequired(this.respawnX);
     this.validateRequired(this.respawnY);
@@ -316,7 +350,6 @@ export class Properties extends LitElement {
     return (
       !this.width.invalid &&
       !this.height.invalid &&
-      !this.music.invalid &&
       !this.ambientSound.invalid &&
       !this.respawnX.invalid &&
       !this.respawnY.invalid
@@ -336,7 +369,7 @@ export class Properties extends LitElement {
             Number.parseInt(this.effect.value),
             this.minimap.checked,
             this.scrolls.checked,
-            this.music.value,
+            Number.parseInt(this.music.value),
             this.ambientSound.value,
             Number.parseInt(this.musicControl.value),
             this.respawnX.value,
